@@ -201,7 +201,8 @@ public class TestSpark {
 	public static void scenarioNominal() {
 		SparkConf conf = new SparkConf().setAppName("Test random").setMaster("local[2]");
 	    JavaSparkContext jsc = new JavaSparkContext(conf);
-	    int n = 5; // n attributes
+	    jsc.setLogLevel("WARN");
+	    int n = 10; // n attributes
 	    long m = 10L; // m item, can be a VERY LARGE number
 	    double minSupport = 0.3;
 	    int numPartition = -1;
