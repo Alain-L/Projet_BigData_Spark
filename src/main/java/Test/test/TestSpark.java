@@ -1,5 +1,6 @@
 package Test.test;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.Consumer;
@@ -94,13 +95,14 @@ public class TestSpark {
 	}
 	
 	public static void testKMeansFichier() {
-		String logFile = "/Users/Alain/Desktop/Test.txt";
+		String logFile = "/Users/Alain/Desktop/Data/Sample1bis.txt";
 	    int k = 5; // nombre de k-moyennes
 	    int iterations = 100; // nombre d'itérations maximums de l'algorithme
 	    int runs = 1; // nombre d'execution de l'algorithme en parallèle
 
 	    SparkConf conf = new SparkConf().setAppName("Simple Application").setMaster("local[2]"); // sur 2 cores en local
 		JavaSparkContext sc = new JavaSparkContext(conf);
+		sc.setLogLevel("WARN");
 	    JavaRDD<String> lines = sc.textFile(logFile).cache();
 	    JavaRDD<Vector> points = lines.map(new ParsePoint());
 
@@ -199,16 +201,19 @@ public class TestSpark {
 	}
 	
 	public static void scenarioNominal() {
-		SparkConf conf = new SparkConf().setAppName("Test random").setMaster("local[2]");
+		SparkConf conf = new SparkConf().setAppName("Test random").setMaster("local[2]").set("spark.driver.memory", "10g");
 	    JavaSparkContext jsc = new JavaSparkContext(conf);
 	    jsc.setLogLevel("WARN");
 	    int n = 10; // n attributes
 	    long m = 10L; // m item, can be a VERY LARGE number
 	    double minSupport = 0.3;
+	    double minConfidence = 0.8;
 	    int numPartition = -1;
 
+	    double debut = System.currentTimeMillis();
 	    //Creation of a RDD with a centered reduced normal random distribution
 	    JavaRDD<Vector> u = RandomRDDs.normalJavaVectorRDD(jsc, m, n, 4);
+	    //JavaRDD<Vector> u = lectureFichier("/Users/Alain/Desktop/Data/Sample1bis.txt", jsc);
 
 	    //Applying a function to extract extreme item sets
 	    JavaRDD<String> v = (JavaRDD<String>) u.map(
@@ -244,11 +249,13 @@ public class TestSpark {
 	  	      .setMinSupport(minSupport)
 	  	      .setNumPartitions(numPartition)
 	  	      .run(transactions);
-	    
+	    	    
 	    //extracting association Rules from the model
-	    AssociationRules arules = new AssociationRules().setMinConfidence(0.8);
-	    JavaRDD<AssociationRules.Rule<String>> results = arules.run((JavaRDD<FreqItemset<String>>) model.freqItemsets().toJavaRDD());
-
+	    AssociationRules arules = new AssociationRules().setMinConfidence(minConfidence);
+	    JavaRDD<FreqItemset<String>> data = model.freqItemsets().toJavaRDD().cache();
+	    JavaRDD<AssociationRules.Rule<String>> results = arules.run(data.cache());
+		
+	    double fin = (System.currentTimeMillis()-debut)/1000;
 	    
 	    //Display
 	    System.out.println(u.take(5)); //take(n) display n first rows
@@ -257,27 +264,46 @@ public class TestSpark {
 //	    for (FPGrowth.FreqItemset<String> s: model.freqItemsets().toJavaRDD().collect()) {
 //		      System.out.println("[" + Joiner.on(",").join(s.javaItems()) + "], " + s.freq());
 //		    }
-
-	    System.out.println("NB règles " + results.count());
-//	    for (AssociationRules.Rule<String> rule : results.collect()) {
-//		      System.out.println(
-//		        rule.javaAntecedent() + " => " + rule.javaConsequent() + ", " + rule.confidence());
-//		    }
+	   
 	    
-	    System.out.println("fini");
+	    int nbExactRules = 0;
+	    for (AssociationRules.Rule<String> rule : results.collect()) {
+	    	if (rule.confidence() == 1)
+	    		nbExactRules++;
+		     // System.out.println(
+		     // rule.javaAntecedent() + " => " + rule.javaConsequent() + ", " + rule.confidence());
+		    }
+	    
+	    System.out.println("NB itemsets fréquents : " + data.count());
+	    System.out.println("NB règles : " + results.cache().count());
+	    System.out.println("NB règles exactes : " + nbExactRules);
+	    System.out.println("Fini, temps de calcul : " + fin + "s");
 	    //Spark closing
 	    jsc.close();
+	}
+	
+	public static JavaRDD<Vector> lectureFichier(String logFile, JavaSparkContext sc)
+	{				
+		JavaRDD<String> lines = sc.textFile(logFile).cache();
+		JavaRDD<Vector> points = lines.map(new ParsePoint());
+			
+		System.out.println(points.collect());
+		
+		return points;
 	}
 	
 	public static void main(String[] args) {
 		try {
 		//test0();
 		//testRDD();
-		//testKMeansFichier();
 		//testKMeansRandom();
 		//testAssociationRules();
 		//testFPGRowth(); // FPGrowth + association Rules
+		//testKMeansFichier();
+		double debut = System.currentTimeMillis();
 		scenarioNominal();
+		double fin = (System.currentTimeMillis()-debut)/1000;
+	    System.out.println("Fini, temps d'execution : " + fin + "s");
 		} catch (Exception e) {
 			System.err.println("Y'A UNE EXCEPTION !!" + e.getMessage());
 		}
