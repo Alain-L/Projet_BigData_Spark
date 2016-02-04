@@ -238,6 +238,7 @@ public class TestSpark {
 	  	        }
 	  	      }
 	  	    );
+	    
 	    //creating FPGrowth model
 	    FPGrowthModel<String> model = new FPGrowth()
 	  	      .setMinSupport(minSupport)
@@ -250,18 +251,20 @@ public class TestSpark {
 
 	    
 	    //Display
-	    System.out.println(u.collect()); 
-	    System.out.println(v.collect()); 
+	    System.out.println(u.take(5)); //take(n) display n first rows
+	    System.out.println(v.take(5)); 
 	    
-	    for (FPGrowth.FreqItemset<String> s: model.freqItemsets().toJavaRDD().collect()) {
-		      System.out.println("[" + Joiner.on(",").join(s.javaItems()) + "], " + s.freq());
-		    }
+//	    for (FPGrowth.FreqItemset<String> s: model.freqItemsets().toJavaRDD().collect()) {
+//		      System.out.println("[" + Joiner.on(",").join(s.javaItems()) + "], " + s.freq());
+//		    }
 
-	    for (AssociationRules.Rule<String> rule : results.collect()) {
-		      System.out.println(
-		        rule.javaAntecedent() + " => " + rule.javaConsequent() + ", " + rule.confidence());
-		    }
+	    System.out.println("NB règles " + results.count());
+//	    for (AssociationRules.Rule<String> rule : results.collect()) {
+//		      System.out.println(
+//		        rule.javaAntecedent() + " => " + rule.javaConsequent() + ", " + rule.confidence());
+//		    }
 	    
+	    System.out.println("fini");
 	    //Spark closing
 	    jsc.close();
 	}
