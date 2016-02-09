@@ -3,6 +3,7 @@ package Test.test;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.regex.Pattern;
@@ -204,17 +205,18 @@ public class TestSpark {
 		SparkConf conf = new SparkConf().setAppName("Test random").setMaster("local[2]").set("spark.driver.memory", "10g");
 	    JavaSparkContext jsc = new JavaSparkContext(conf);
 	    jsc.setLogLevel("WARN");
-	    int n = 10; // n attributes
-	    long m = 10L; // m item, can be a VERY LARGE number
+	    int n = 700; // n attributes
+	    long m = 700L; // m item, can be a VERY LARGE number
 	    double minSupport = 0.3;
 	    double minConfidence = 0.8;
 	    int numPartition = -1;
+	    List<String> nomAttributs =  new ArrayList<String>();
 
 	    double debut = System.currentTimeMillis();
 	    //Creation of a RDD with a centered reduced normal random distribution
-	    JavaRDD<Vector> u = RandomRDDs.normalJavaVectorRDD(jsc, m, n, 4);
-	    //JavaRDD<Vector> u = lectureFichier("/Users/Alain/Desktop/Data/Sample1bis.txt", jsc);
-
+	    //JavaRDD<Vector> u = RandomRDDs.normalJavaVectorRDD(jsc, m, n, 4);
+	    JavaRDD<Vector> u = lectureFichier("/Users/Alain/Desktop/Data/Sample1.txt", jsc, nomAttributs);
+	    
 	    //Applying a function to extract extreme item sets
 	    JavaRDD<String> v = (JavaRDD<String>) u.map(
 		   new Function<Vector,String>() {
@@ -223,11 +225,11 @@ public class TestSpark {
 		    	 for(int i=0; i< v.size(); i++) {
 		    		 if (v.apply(i) < -0.5)
 		    		 {
-		    			 s.append("A"+Integer.toString(i+1)+"_low ");
+		    			 s.append(nomAttributs.get(i)+Integer.toString(i+1)+"_low ");
 		    		 }
 		    		 else if (v.apply(i) > 0.5)
 		    		 {
-		    			 s.append("A"+Integer.toString(i+1)+"_high ");
+		    			 s.append(nomAttributs.get(i)+Integer.toString(i+1)+"_high ");
 		    		 }
 		    	 }
 		    	 return s.toString();
@@ -273,7 +275,7 @@ public class TestSpark {
 		     // System.out.println(
 		     // rule.javaAntecedent() + " => " + rule.javaConsequent() + ", " + rule.confidence());
 		    }
-	    
+	    System.out.println("NB atrributs : " + nomAttributs.size());
 	    System.out.println("NB itemsets fréquents : " + data.count());
 	    System.out.println("NB règles : " + results.cache().count());
 	    System.out.println("NB règles exactes : " + nbExactRules);
@@ -282,12 +284,22 @@ public class TestSpark {
 	    jsc.close();
 	}
 	
-	public static JavaRDD<Vector> lectureFichier(String logFile, JavaSparkContext sc)
+	public static JavaRDD<Vector> lectureFichier(String logFile, JavaSparkContext sc, List<String> nomAttributs)
 	{				
 		JavaRDD<String> lines = sc.textFile(logFile).cache();
+		String premLigne = lines.first();
+		nomAttributs.addAll(Arrays.asList(premLigne.split("\t")));
+		lines = lines.filter(new 
+				Function<String, Boolean>() {
+			@Override
+			public Boolean call(String arg0) throws Exception {
+			return !premLigne.equals(arg0);
+			}
+			});
 		JavaRDD<Vector> points = lines.map(new ParsePoint());
-			
-		System.out.println(points.collect());
+		 
+		
+		System.out.println("NB atrributs : " + nomAttributs.size());
 		
 		return points;
 	}
