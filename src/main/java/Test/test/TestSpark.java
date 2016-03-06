@@ -15,6 +15,7 @@ import scala.Tuple2;
 
 import org.apache.spark.api.java.*;
 import org.apache.spark.api.*;
+import org.apache.hadoop.hdfs.server.namenode.FSEditLogLoader.PositionTrackingInputStream;
 import org.apache.spark.*;
 import org.apache.spark.api.java.function.*;
 import org.apache.spark.mllib.clustering.KMeans;
@@ -95,17 +96,19 @@ public class TestSpark {
 	    jsc.close();
 	}
 	
-	public static void testKMeansFichier() {
-		String logFile = "/Users/Alain/Desktop/Data/Sample1bis.txt";
+	public static void kMeans() {
+		String logFile = "/Users/Alain/Desktop/Data/net1_500_500.txt";
 	    int k = 5; // nombre de k-moyennes
 	    int iterations = 100; // nombre d'itérations maximums de l'algorithme
 	    int runs = 1; // nombre d'execution de l'algorithme en parallèle
+	    List<String> nomAttributs =  new ArrayList<String>();
 
 	    SparkConf conf = new SparkConf().setAppName("Simple Application").setMaster("local[2]"); // sur 2 cores en local
-		JavaSparkContext sc = new JavaSparkContext(conf);
-		sc.setLogLevel("WARN");
-	    JavaRDD<String> lines = sc.textFile(logFile).cache();
-	    JavaRDD<Vector> points = lines.map(new ParsePoint());
+		JavaSparkContext jsc = new JavaSparkContext(conf);
+		jsc.setLogLevel("WARN");
+		JavaRDD<Vector> points = RandomRDDs.normalJavaVectorRDD(jsc, 100, 500, 4);
+	    //JavaRDD<Vector> points = lectureFichier("/Users/Alain/Desktop/Data/net1_100_500.txt", jsc, nomAttributs);
+
 
 	    KMeansModel model = KMeans.train(points.rdd(), k, iterations, runs, KMeans.K_MEANS_PARALLEL());
 
@@ -117,8 +120,8 @@ public class TestSpark {
 	    double cost = model.computeCost(points.rdd());
 	    System.out.println("Cost: " + cost);
 
-	    sc.stop();
-	    sc.close();
+	    jsc.stop();
+	    jsc.close();
 	}
 
 	public static void testKMeansRandom() {
@@ -201,12 +204,12 @@ public class TestSpark {
 	    }
 	}
 	
-	public static void scenarioNominal() {
+	public static void associationRules() {
 		SparkConf conf = new SparkConf().setAppName("Test random").setMaster("local[2]").set("spark.driver.memory", "10g");
 	    JavaSparkContext jsc = new JavaSparkContext(conf);
 	    jsc.setLogLevel("WARN");
-	    int n = 700; // n attributes
-	    long m = 700L; // m item, can be a VERY LARGE number
+	    int n = 600; // n attributes
+	    long m = 100L; // m item, can be a VERY LARGE number
 	    double minSupport = 0.3;
 	    double minConfidence = 0.8;
 	    int numPartition = -1;
@@ -215,7 +218,7 @@ public class TestSpark {
 	    double debut = System.currentTimeMillis();
 	    //Creation of a RDD with a centered reduced normal random distribution
 	    //JavaRDD<Vector> u = RandomRDDs.normalJavaVectorRDD(jsc, m, n, 4);
-	    JavaRDD<Vector> u = lectureFichier("/Users/Alain/Desktop/Data/Sample1.txt", jsc, nomAttributs);
+	    JavaRDD<Vector> u = lectureFichier("/Users/Alain/Desktop/Data/net1_500_30.txt", jsc, nomAttributs);
 	    
 	    //Applying a function to extract extreme item sets
 	    JavaRDD<String> v = (JavaRDD<String>) u.map(
@@ -225,11 +228,13 @@ public class TestSpark {
 		    	 for(int i=0; i< v.size(); i++) {
 		    		 if (v.apply(i) < -0.5)
 		    		 {
-		    			 s.append(nomAttributs.get(i)+Integer.toString(i+1)+"_low ");
+		    			 s.append(nomAttributs.get(i)+"_low ");
+		    			 //s.append("A"+Integer.toString(i+1)+"_low ");
 		    		 }
 		    		 else if (v.apply(i) > 0.5)
 		    		 {
-		    			 s.append(nomAttributs.get(i)+Integer.toString(i+1)+"_high ");
+		    			 s.append(nomAttributs.get(i)+"_high ");
+		    			 //s.append("A"+Integer.toString(i+1)+"_high ");
 		    		 }
 		    	 }
 		    	 return s.toString();
@@ -295,25 +300,19 @@ public class TestSpark {
 			public Boolean call(String arg0) throws Exception {
 			return !premLigne.equals(arg0);
 			}
-			});
-		JavaRDD<Vector> points = lines.map(new ParsePoint());
-		 
+			}); 
+		JavaRDD<Vector> points = lines.map(new ParsePoint());		 
 		
-		System.out.println("NB atrributs : " + nomAttributs.size());
+		// fonction "distinct()" pour retourner les lignes différentes du RDD.
 		
 		return points;
 	}
 	
 	public static void main(String[] args) {
 		try {
-		//test0();
-		//testRDD();
-		//testKMeansRandom();
-		//testAssociationRules();
-		//testFPGRowth(); // FPGrowth + association Rules
-		//testKMeansFichier();
 		double debut = System.currentTimeMillis();
-		scenarioNominal();
+		//associationRules();
+		kMeans();
 		double fin = (System.currentTimeMillis()-debut)/1000;
 	    System.out.println("Fini, temps d'execution : " + fin + "s");
 		} catch (Exception e) {
